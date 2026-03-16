@@ -26,6 +26,18 @@ interface PasteResult {
 	sizeBytes: number;
 }
 
+const FORMAT_ICONS = {
+	plain: TextT,
+	markdown: MarkdownLogo,
+	code: Code,
+} as const;
+
+const FORMAT_SHORT_LABELS = {
+	plain: "Text",
+	markdown: "Markdown",
+	code: "Code",
+} as const;
+
 export function PasteForm() {
 	const [content, setContent] = useState("");
 	const [format, setFormat] = useState<PasteFormat>("plain");
@@ -119,102 +131,90 @@ export function PasteForm() {
 
 	return (
 		<div className="mx-auto w-full max-w-3xl">
-			{/* Textarea */}
-			<div className="relative">
-				<textarea
-					ref={textareaRef}
-					value={content}
-					onChange={(e) => setContent(e.target.value)}
-					placeholder="Paste or type your text here..."
-					className="min-h-[400px] w-full resize-y rounded-xl border border-border bg-card px-5 py-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
-					spellCheck={false}
-				/>
-				{content.length > 0 && (
-					<div className="absolute right-3 bottom-3 text-xs text-muted-foreground">
-						<span className={sizeOverLimit ? "text-destructive" : ""}>
-							{formatBytes(sizeBytes)}
-						</span>
-						{" / 5 MB"}
-					</div>
-				)}
-			</div>
+			{/* Editor window */}
+			<div className="overflow-hidden rounded-xl border border-white/[0.07] bg-card shadow-[0_0_0_1px_oklch(1_0_0/0.03),0_32px_64px_-16px_oklch(0_0_0/0.7),0_0_0_1px_oklch(0_0_0/0.3)inset]">
+				{/* Titlebar */}
+				<div className="flex h-10 items-center gap-3 border-b border-white/[0.06] bg-white/[0.02] px-4">
+					{/* Left spacer — mirrors language picker width to keep format picker truly centered */}
+					<div className="w-28 shrink-0" />
 
-			{/* Options bar — row 1: format + submit */}
-			<div className="mt-3 flex items-center gap-2">
-				{/* Format picker */}
-				<div className="flex items-center rounded-lg border border-border bg-card">
-					{FORMAT_OPTIONS.map((opt) => {
-						const Icon =
-							opt.value === "plain"
-								? TextT
-								: opt.value === "markdown"
-									? MarkdownLogo
-									: Code;
-						return (
-							<button
-								key={opt.value}
-								onClick={() => setFormat(opt.value as PasteFormat)}
-								className={`inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium transition-colors ${
-									format === opt.value
-										? "bg-accent text-accent-foreground"
-										: "text-muted-foreground hover:text-foreground"
-								} ${opt.value === "plain" ? "rounded-l-lg" : ""} ${opt.value === "code" ? "rounded-r-lg" : ""}`}
-							>
-								<Icon size={14} />
-								{opt.label}
-							</button>
-						);
-					})}
+					{/* Format picker — centered */}
+					<div className="flex flex-1 items-center justify-center">
+						<div className="flex rounded-md bg-white/[0.06] p-0.5">
+							{FORMAT_OPTIONS.map((opt) => {
+								const Icon = FORMAT_ICONS[opt.value as PasteFormat];
+								const isActive = format === opt.value;
+								return (
+									<button
+										key={opt.value}
+										onClick={() => setFormat(opt.value as PasteFormat)}
+										className={`inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-xs font-medium transition-all ${
+											isActive
+												? "bg-white/[0.1] text-foreground shadow-sm"
+												: "text-muted-foreground hover:text-foreground/70"
+										}`}
+									>
+										<Icon size={12} />
+										{FORMAT_SHORT_LABELS[opt.value as PasteFormat]}
+									</button>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* Language picker (right side, only for code) */}
+					<div className="flex w-28 shrink-0 justify-end">
+						{format === "code" && (
+							<div className="relative flex items-center">
+								<select
+									value={language}
+									onChange={(e) => setLanguage(e.target.value)}
+									className="h-6 appearance-none rounded bg-white/[0.06] pl-2.5 pr-6 text-xs text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+								>
+									{POPULAR_LANGUAGES.map((lang) => (
+										<option key={lang} value={lang}>
+											{lang}
+										</option>
+									))}
+								</select>
+								<CaretDown
+									size={10}
+									className="pointer-events-none absolute right-1.5 text-muted-foreground"
+								/>
+							</div>
+						)}
+					</div>
 				</div>
 
-				<div className="flex-1" />
-
-				{/* Submit */}
-				<button
-					onClick={handleSubmit}
-					disabled={!content.trim() || loading || sizeOverLimit}
-					className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-all hover:brightness-110 disabled:opacity-40 disabled:hover:brightness-100"
-				>
-					{loading ? (
-						"Creating..."
-					) : (
-						<>
-							Share
-							<ArrowRight size={14} weight="bold" />
-						</>
+				{/* Textarea */}
+				<div className="relative">
+					<textarea
+						ref={textareaRef}
+						value={content}
+						onChange={(e) => setContent(e.target.value)}
+						placeholder="Paste or type your text here..."
+						className="min-h-[380px] w-full resize-y bg-transparent px-5 py-4 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/25 focus:outline-none"
+						spellCheck={false}
+					/>
+					{content.length > 0 && (
+						<div className="pointer-events-none absolute right-3 bottom-3 text-xs text-muted-foreground/35">
+							<span className={sizeOverLimit ? "text-destructive" : ""}>
+								{formatBytes(sizeBytes)}
+							</span>
+							{" / 5 MB"}
+						</div>
 					)}
-				</button>
+				</div>
 			</div>
 
-			{/* Options bar — row 2: secondary controls */}
-			<div className="mt-2 flex flex-wrap items-center gap-2">
-				{/* Language picker (only for code) */}
-				{format === "code" && (
-					<div className="relative flex items-center">
-						<select
-							value={language}
-							onChange={(e) => setLanguage(e.target.value)}
-							className="h-8 appearance-none rounded-lg border border-border bg-card pl-3 pr-7 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-						>
-							{POPULAR_LANGUAGES.map((lang) => (
-								<option key={lang} value={lang}>
-									{lang}
-								</option>
-							))}
-						</select>
-						<CaretDown
-							size={11}
-							className="pointer-events-none absolute right-2.5 text-muted-foreground"
-						/>
-					</div>
-				)}
-
+			{/* Controls */}
+			<div className="mt-3 flex items-center gap-2">
 				{/* Expiry picker */}
 				<div className="relative flex items-center">
 					<select
 						value={expirySeconds}
 						onChange={(e) => setExpirySeconds(Number(e.target.value))}
-						className="h-8 appearance-none rounded-lg border border-border bg-card pl-3 pr-7 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+						className="h-8 appearance-none rounded-lg border border-white/[0.08] bg-white/[0.04] pl-3 pr-7 text-xs text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus:ring-1 focus:ring-white/20"
 					>
 						{EXPIRY_OPTIONS.map((opt) => (
 							<option key={opt.value} value={opt.value}>
@@ -223,40 +223,57 @@ export function PasteForm() {
 						))}
 					</select>
 					<CaretDown
-						size={11}
-						className="pointer-events-none absolute right-2.5 text-muted-foreground"
+						size={10}
+						className="pointer-events-none absolute right-2.5 text-muted-foreground/50"
 					/>
 				</div>
 
 				{/* Burn after read */}
 				<button
 					onClick={() => setBurnAfterRead(!burnAfterRead)}
-					className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
+					className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all ${
 						burnAfterRead
-							? "border-orange-500/50 bg-orange-500/10 text-orange-400"
-							: "border-border text-muted-foreground hover:text-foreground"
+							? "border-orange-500/40 bg-orange-500/10 text-orange-400"
+							: "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:text-foreground"
 					}`}
 				>
-					<Fire size={14} weight={burnAfterRead ? "fill" : "regular"} />
+					<Fire size={13} weight={burnAfterRead ? "fill" : "regular"} />
 					Burn after read
 				</button>
-			</div>
 
-			{/* Keyboard hint */}
-			<div className="mt-2 text-right text-xs text-muted-foreground/50">
-				<kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
-					{isMac ? "⌘" : "Ctrl"}
-				</kbd>
-				{" + "}
-				<kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">
-					Enter
-				</kbd>
-				{" to share"}
+				<div className="flex-1" />
+
+				{/* Keyboard hint */}
+				<div className="text-xs text-muted-foreground/30">
+					<kbd className="rounded border border-white/[0.08] px-1.5 py-0.5 text-[10px]">
+						{isMac ? "⌘" : "Ctrl"}
+					</kbd>
+					<span className="mx-1 opacity-50">+</span>
+					<kbd className="rounded border border-white/[0.08] px-1.5 py-0.5 text-[10px]">
+						↵
+					</kbd>
+				</div>
+
+				{/* Submit */}
+				<button
+					onClick={handleSubmit}
+					disabled={!content.trim() || loading || sizeOverLimit}
+					className="inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-all hover:brightness-110 hover:shadow-[0_0_20px_-4px_oklch(0.56_0.23_264/0.65)] disabled:opacity-35 disabled:shadow-none disabled:hover:brightness-100"
+				>
+					{loading ? (
+						"Sharing..."
+					) : (
+						<>
+							Share
+							<ArrowRight size={13} weight="bold" />
+						</>
+					)}
+				</button>
 			</div>
 
 			{/* Error */}
 			{error && (
-				<div className="mt-3 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+				<div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
 					{error}
 				</div>
 			)}

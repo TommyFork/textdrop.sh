@@ -5,7 +5,7 @@ let highlighter: Highlighter | null = null;
 export async function getHighlighter(): Promise<Highlighter> {
 	if (!highlighter) {
 		highlighter = await createHighlighter({
-			themes: ["vitesse-dark"],
+			themes: ["tokyo-night"],
 			langs: [
 				"typescript",
 				"javascript",
@@ -46,6 +46,6 @@ export async function highlightCode(
 
 	return hl.codeToHtml(code, {
 		lang,
-		theme: "vitesse-dark",
+		theme: "tokyo-night",
 	});
 }
