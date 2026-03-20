@@ -1,3 +1,5 @@
+<img width="64" height="64" alt="favicon_512" src="https://github.com/user-attachments/assets/7cc61656-f700-4a9d-8a84-523bacc969d1" />
+
 # just-text
 
 Share text. Nothing else.
