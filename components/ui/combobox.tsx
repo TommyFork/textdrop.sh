@@ -167,12 +167,7 @@ interface ComboboxListProps {
 
 function ComboboxList({ children, className }: ComboboxListProps) {
 	return (
-		<div
-			className={cn(
-				"scrollbar-thin-dark max-h-48 overflow-y-auto py-1",
-				className,
-			)}
-		>
+		<div className={cn("max-h-48 overflow-y-auto py-1", className)}>
 			{children}
 		</div>
 	);

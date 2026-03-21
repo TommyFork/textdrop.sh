@@ -42,12 +42,10 @@ export async function getHighlighter(): Promise<Highlighter> {
 
 function buildTokenStyle(token: {
 	color?: string;
-	bgColor?: string;
 	fontStyle?: number;
 }): string {
 	const styles: string[] = [];
 	if (token.color) styles.push(`color:${token.color}`);
-	if (token.bgColor) styles.push(`background-color:${token.bgColor}`);
 	const fs = token.fontStyle as number;
 	if (fs & 1) styles.push("font-style:italic");
 	if (fs & 2) styles.push("font-weight:bold");
@@ -67,16 +65,17 @@ export async function highlightCode(
 	) as BundledLanguage;
 
 	const tokensResult = hl.codeToTokens(code, { lang, theme: "tokyo-night" });
+	const gutterWidth = String(tokensResult.tokens.length).length;
 
-	const lines = tokensResult.tokens.map((lineTokens) => {
+	const lines = tokensResult.tokens.map((lineTokens, index) => {
 		const tokensHtml = lineTokens
 			.map((token) => {
 				const style = buildTokenStyle(token);
 				return `<span${style ? ` style="${style}"` : ""}>${token.content}</span>`;
 			})
 			.join("");
-		return `<span class="shiki-line">${tokensHtml}</span>`;
+		return `<span class="shiki-line"><span class="shiki-ln">${index + 1}</span>${tokensHtml}</span>`;
 	});
 
-	return `<pre class="shiki-pre" style="color:${tokensResult.fg}" tabindex="0"><code>${lines.join("\n")}</code></pre>`;
+	return `<pre class="shiki-pre" style="color:${tokensResult.fg};--gutter-width:${gutterWidth}ch" tabindex="0"><code>${lines.join("")}</code></pre>`;
 }
