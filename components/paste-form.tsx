@@ -280,7 +280,7 @@ export function PasteForm() {
 									setLanguage(langKey || value.toLowerCase());
 								}}
 							>
-								<ComboboxTrigger className="w-24 sm:w-32 shrink-0">
+								<ComboboxTrigger className="w-32">
 									{displayLang(language)}
 								</ComboboxTrigger>
 								<ComboboxContent>
