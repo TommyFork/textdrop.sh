@@ -21,7 +21,7 @@ export function proxy(request: NextRequest) {
 		// 'unsafe-inline', so arbitrary inline scripts remain blocked even on preview.
 		// If Vercel updates the toolbar the hash changes and the toolbar silently
 		// breaks (CSP violation in console) — not a security issue, just cosmetic.
-		`script-src 'self' 'nonce-${nonce}' https://www.googletagmanager.com${isPreview ? " https://vercel.live 'sha256-swwZR+NXg32d7EaRirit+Gzs3edtfXLd8ejkuL2DzYM='" : ""}`,
+		`script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval' https://www.googletagmanager.com${isPreview ? " https://vercel.live 'sha256-swwZR+NXg32d7EaRirit+Gzs3edtfXLd8ejkuL2DzYM='" : ""}`,
 		// Tailwind inline styles and Shiki's style injections still require this
 		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data:",
