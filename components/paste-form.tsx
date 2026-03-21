@@ -18,6 +18,7 @@ import {
 	ComboboxList,
 	ComboboxSearch,
 	ComboboxTrigger,
+	useCombobox,
 } from "@/components/ui/combobox";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -61,6 +62,36 @@ const FORMAT_OPTIONS: {
 
 function displayLang(lang: string): string {
 	return getLanguageDisplayName(lang);
+}
+
+function LanguageList() {
+	const { searchQuery } = useCombobox();
+
+	const filteredLanguages = useMemo(() => {
+		const query = searchQuery.toLowerCase();
+		return (POPULAR_LANGUAGES as readonly string[]).filter((lang) => {
+			const displayName = displayLang(lang).toLowerCase();
+			return displayName.includes(query) || lang.toLowerCase().includes(query);
+		});
+	}, [searchQuery]);
+
+	if (filteredLanguages.length === 0) {
+		return (
+			<ComboboxList>
+				<ComboboxEmpty>No languages found</ComboboxEmpty>
+			</ComboboxList>
+		);
+	}
+
+	return (
+		<ComboboxList>
+			{filteredLanguages.map((lang) => (
+				<ComboboxItem key={lang} value={displayLang(lang)}>
+					{displayLang(lang)}
+				</ComboboxItem>
+			))}
+		</ComboboxList>
+	);
 }
 
 export function PasteForm() {
@@ -254,13 +285,7 @@ export function PasteForm() {
 								</ComboboxTrigger>
 								<ComboboxContent>
 									<ComboboxSearch placeholder="Search languages..." />
-									<ComboboxList>
-										{(POPULAR_LANGUAGES as readonly string[]).map((lang) => (
-											<ComboboxItem key={lang} value={displayLang(lang)}>
-												{displayLang(lang)}
-											</ComboboxItem>
-										))}
-									</ComboboxList>
+									<LanguageList />
 								</ComboboxContent>
 							</Combobox>
 						)}
