@@ -21,13 +21,6 @@ import {
 	useCombobox,
 } from "@/components/ui/combobox";
 import { Kbd } from "@/components/ui/kbd";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	DEFAULT_EXPIRY_VALUE,
@@ -318,21 +311,26 @@ export function PasteForm() {
 			{/* Controls */}
 			<div className="mt-3 flex flex-wrap items-center gap-2 sm:flex-nowrap">
 				{/* Expiry picker */}
-				<Select
-					value={String(expirySeconds)}
-					onValueChange={(v) => setExpirySeconds(Number(v))}
+				<Combobox
+					value={EXPIRY_OPTIONS.find((o) => o.value === expirySeconds)?.label ?? ""}
+					onValueChange={(label) => {
+						const opt = EXPIRY_OPTIONS.find((o) => o.label === label);
+						if (opt) setExpirySeconds(opt.value);
+					}}
 				>
-					<SelectTrigger className="h-8 w-auto bg-white/[0.04] border-white/[0.08] text-xs text-muted-foreground hover:bg-white/[0.06] [&>span]:truncate">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent className="bg-card border-white/[0.07]">
-						{EXPIRY_OPTIONS.map((opt) => (
-							<SelectItem key={opt.value} value={String(opt.value)}>
-								{opt.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+					<ComboboxTrigger className="h-8">
+						{EXPIRY_OPTIONS.find((o) => o.value === expirySeconds)?.label}
+					</ComboboxTrigger>
+					<ComboboxContent align="start">
+						<ComboboxList>
+							{EXPIRY_OPTIONS.map((opt) => (
+								<ComboboxItem key={opt.value} value={opt.label}>
+									{opt.label}
+								</ComboboxItem>
+							))}
+						</ComboboxList>
+					</ComboboxContent>
+				</Combobox>
 
 				{/* Burn after read */}
 				<Button
