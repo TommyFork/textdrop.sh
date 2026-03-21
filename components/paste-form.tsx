@@ -243,7 +243,7 @@ export function PasteForm() {
 									disabled={loading}
 									aria-pressed={format === opt.value}
 									className={cn(
-										"relative z-10 inline-flex h-6 items-center justify-center gap-1 rounded-full px-2 sm:px-3 text-xs font-medium leading-none transition-colors disabled:pointer-events-none whitespace-nowrap",
+										"relative z-10 inline-flex h-6 items-center justify-center gap-1 rounded-full px-2 sm:px-3 text-xs font-medium leading-none transition-colors disabled:pointer-events-none whitespace-nowrap cursor-pointer",
 										format === opt.value
 											? "text-foreground"
 											: "text-muted-foreground hover:text-foreground/80",
@@ -273,7 +273,7 @@ export function PasteForm() {
 									setLanguage(langKey || value.toLowerCase());
 								}}
 							>
-								<ComboboxTrigger className="w-32 sm:w-44 shrink-0">
+								<ComboboxTrigger className="w-32 sm:w-44 shrink-0 cursor-pointer">
 									{displayLang(language)}
 								</ComboboxTrigger>
 								<ComboboxContent>
@@ -320,7 +320,7 @@ export function PasteForm() {
 						if (opt) setExpirySeconds(opt.value);
 					}}
 				>
-					<ComboboxTrigger className="h-8">
+					<ComboboxTrigger className="cursor-pointer">
 						{EXPIRY_OPTIONS.find((o) => o.value === expirySeconds)?.label}
 					</ComboboxTrigger>
 					<ComboboxContent align="start">
@@ -340,7 +340,7 @@ export function PasteForm() {
 					size="sm"
 					onClick={() => setBurnAfterRead(!burnAfterRead)}
 					className={cn(
-						"h-8 gap-1.5 rounded-full border px-3 text-xs font-medium transition-all",
+						"h-8 gap-1.5 rounded-full border px-3 text-xs font-medium transition-all cursor-pointer",
 						burnAfterRead
 							? "border-orange-500/40 bg-orange-500/10 text-orange-400 hover:bg-orange-500/15 hover:text-orange-400"
 							: "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-foreground",
@@ -378,7 +378,7 @@ export function PasteForm() {
 					onClick={handleSubmit}
 					disabled={isSubmitDisabled}
 					className={cn(
-						"h-8 min-w-[4rem] gap-1.5 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition-all hover:brightness-110 disabled:opacity-35 disabled:hover:brightness-100",
+						"h-8 min-w-[4rem] gap-1.5 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition-all hover:brightness-110 disabled:opacity-35 disabled:hover:brightness-100 cursor-pointer",
 						isSubmitDisabled
 							? "shadow-none"
 							: "shadow-[0_0_20px_-4px_oklch(0.56_0.23_264/0.65)]",

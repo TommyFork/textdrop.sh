@@ -1,12 +1,6 @@
 "use client";
 
-import {
-	DotsThree,
-	Fire,
-	GitFork,
-	GithubLogo,
-	TextT,
-} from "@phosphor-icons/react";
+import { DotsThree, Fire, GitFork, TextT } from "@phosphor-icons/react";
 import { format } from "date-fns";
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
@@ -179,7 +173,7 @@ export function PasteView({ paste, highlightedHtml }: PasteViewProps) {
 						</div>
 					</div>
 				) : paste.format === "markdown" ? (
-					<div className="prose prose-sm prose-invert max-w-none p-4 sm:prose-base sm:p-7 prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-[1.5em] prose-h2:text-[1.2em] prose-h3:text-[1.05em] prose-p:leading-[1.8] prose-a:text-blue-400 prose-a:font-normal prose-a:no-underline prose-strong:text-foreground/90 prose-em:text-foreground/80 prose-code:text-[0.82em] prose-code:font-mono prose-code:font-normal prose-code:bg-white/[0.09] prose-code:px-[0.4em] prose-code:py-[0.18em] prose-code:rounded-md prose-code:text-sky-300/80 prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-xl prose-pre:bg-[oklch(0.13_0_0)] prose-pre:border prose-pre:border-white/[0.07] prose-pre:overflow-x-auto prose-pre:my-4 prose-blockquote:border-l-[3px] prose-blockquote:border-primary/60 prose-blockquote:bg-primary/[0.04] prose-blockquote:rounded-r-lg prose-blockquote:py-0.5 prose-blockquote:px-5 prose-blockquote:my-4 prose-blockquote:text-muted-foreground/80 prose-hr:border-white/[0.07] prose-hr:my-6 prose-table:text-sm prose-table:w-full prose-thead:border-b prose-thead:border-white/[0.1] prose-th:py-2 prose-th:px-3 prose-th:font-medium prose-th:text-muted-foreground/60 prose-td:py-2 prose-td:px-3 prose-tr:border-b prose-tr:border-white/[0.05] prose-img:rounded-xl prose-img:border prose-img:border-white/[0.07] prose-ul:my-3 prose-ol:my-3 prose-li:my-1 [&_a:hover]:underline [&_pre_code]:block [&_pre_code]:bg-transparent [&_pre_code]:px-4 [&_pre_code]:py-3.5 [&_pre_code]:leading-relaxed [&_pre_code]:text-foreground/80 [&_pre_code]:text-[0.8125rem] [&_blockquote_p]:my-2 [&_h2]:border-b [&_h2]:border-white/[0.07] [&_h2]:pb-2 [&_thead]:bg-white/[0.03] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+					<div className="prose prose-invert max-w-none p-4 sm:p-6 text-[0.9375rem] sm:text-[0.9375rem] leading-[1.65] prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-[1.3em] prose-h2:text-[1.15em] prose-h3:text-[1.05em] prose-p:leading-[1.65] prose-a:text-blue-400 prose-a:font-normal prose-a:no-underline prose-strong:text-foreground/90 prose-em:text-foreground/80 prose-code:text-[0.85em] prose-code:font-mono prose-code:font-normal prose-code:bg-white/[0.09] prose-code:px-[0.4em] prose-code:py-[0.18em] prose-code:rounded-md prose-code:text-sky-300/80 prose-code:before:content-none prose-code:after:content-none prose-pre:rounded-xl prose-pre:bg-[oklch(0.13_0_0)] prose-pre:border prose-pre:border-white/[0.07] prose-pre:overflow-x-auto prose-pre:my-4 prose-pre:mx-0 prose-blockquote:border-l-[3px] prose-blockquote:border-primary/60 prose-blockquote:bg-primary/[0.04] prose-blockquote:rounded-r-lg prose-blockquote:py-0.5 prose-blockquote:px-5 prose-blockquote:my-4 prose-blockquote:text-muted-foreground/80 prose-hr:border-white/[0.07] prose-hr:my-6 prose-table:text-sm prose-table:w-full prose-thead:border-b prose-thead:border-white/[0.1] prose-th:py-2 prose-th:px-3 prose-th:font-medium prose-th:text-muted-foreground/60 prose-td:py-2 prose-td:px-3 prose-tr:border-b prose-tr:border-white/[0.05] prose-img:rounded-xl prose-img:border prose-img:border-white/[0.07] prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 [&_a:hover]:underline [&_pre_code]:block [&_pre_code]:bg-transparent [&_pre_code]:px-4 [&_pre_code]:py-3.5 [&_pre_code]:leading-relaxed [&_pre_code]:text-foreground/80 [&_pre_code]:text-[0.8125rem] [&_blockquote_p]:my-2 [&_h2]:border-b [&_h2]:border-white/[0.07] [&_h2]:pb-2 [&_thead]:bg-white/[0.03] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
 						<ReactMarkdown
 							remarkPlugins={remarkPlugins}
 							rehypePlugins={rehypePlugins}
@@ -277,15 +271,6 @@ export function PasteView({ paste, highlightedHtml }: PasteViewProps) {
 						{lineCount} {lineCount === 1 ? "line" : "lines"}
 					</span>
 				</div>
-				<a
-					href="https://github.com/TommyFork/textdrop.sh"
-					target="_blank"
-					rel="noopener noreferrer"
-					className="inline-flex items-center gap-1 text-xs text-muted-foreground/50 transition-colors hover:text-foreground/70"
-				>
-					<GithubLogo size={14} />
-					GitHub
-				</a>
 			</div>
 		</div>
 	);

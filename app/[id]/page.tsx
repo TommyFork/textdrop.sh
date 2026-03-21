@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { BurnGate } from "@/components/burn-gate";
+import { Footer } from "@/components/footer";
 import { PasteView } from "@/components/paste-view";
 import { highlightCode } from "@/lib/highlight";
 import { getPaste, getPasteMetadata } from "@/lib/paste";
@@ -38,6 +39,7 @@ export default async function ViewPaste({ params }: PageProps) {
 		return (
 			<div className="min-h-svh px-4 py-4 md:py-8">
 				<BurnGate id={id} />
+				<Footer />
 			</div>
 		);
 	}
@@ -57,6 +59,7 @@ export default async function ViewPaste({ params }: PageProps) {
 	return (
 		<div className="min-h-svh px-4 py-4 md:py-8">
 			<PasteView paste={paste} highlightedHtml={highlightedHtml} />
+			<Footer />
 		</div>
 	);
 }
