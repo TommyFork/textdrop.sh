@@ -243,7 +243,7 @@ export function PasteForm() {
 									disabled={loading}
 									aria-pressed={format === opt.value}
 									className={cn(
-										"relative z-10 inline-flex h-6 items-center justify-center gap-1 rounded-full px-2 sm:px-3 text-xs font-medium transition-colors disabled:pointer-events-none whitespace-nowrap",
+										"relative z-10 inline-flex h-6 items-center justify-center gap-1 rounded-full px-2 sm:px-3 text-xs font-medium leading-none transition-colors disabled:pointer-events-none whitespace-nowrap",
 										format === opt.value
 											? "text-foreground"
 											: "text-muted-foreground hover:text-foreground/80",
@@ -273,7 +273,7 @@ export function PasteForm() {
 									setLanguage(langKey || value.toLowerCase());
 								}}
 							>
-								<ComboboxTrigger className="w-32">
+								<ComboboxTrigger className="w-32 sm:w-44 shrink-0">
 									{displayLang(language)}
 								</ComboboxTrigger>
 								<ComboboxContent>
