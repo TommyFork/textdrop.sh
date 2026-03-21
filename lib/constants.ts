@@ -1,7 +1,7 @@
 export const MAX_PASTE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const MAX_PASTE_SIZE_LABEL = "5MB";
 export const DEFAULT_EXPIRY_SECONDS = 30 * 24 * 60 * 60; // 30 days
-export const ID_LENGTH = 10;
+export const ID_LENGTH = 6;
 
 export const EXPIRY_OPTIONS = [
 	{ label: "1 hour", value: 3600 },
