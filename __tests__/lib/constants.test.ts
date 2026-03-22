@@ -5,6 +5,7 @@ import {
 	EXPIRY_OPTIONS,
 	FORMAT_OPTIONS,
 	ID_LENGTH,
+	MAX_CIPHERTEXT_BYTES,
 	MAX_PASTE_SIZE_BYTES,
 	MAX_PASTE_SIZE_LABEL,
 	POPULAR_LANGUAGES,
@@ -15,6 +16,13 @@ describe("constants", () => {
 		const expected = 5 * 1024 * 1024;
 		expect(MAX_PASTE_SIZE_BYTES).toBe(expected);
 		expect(MAX_PASTE_SIZE_LABEL).toBe("5MB");
+	});
+
+	it("MAX_CIPHERTEXT_BYTES is larger than MAX_PASTE_SIZE_BYTES to account for Base64URL expansion", () => {
+		// Base64 expands ~1.37×; AES-GCM appends a 16-byte auth tag.
+		// MAX_CIPHERTEXT_BYTES must comfortably exceed 1.37 × MAX_PASTE_SIZE_BYTES.
+		expect(MAX_CIPHERTEXT_BYTES).toBeGreaterThan(MAX_PASTE_SIZE_BYTES);
+		expect(MAX_CIPHERTEXT_BYTES).toBe(7 * 1024 * 1024);
 	});
 
 	it("DEFAULT_EXPIRY_SECONDS is 30 days in seconds", () => {

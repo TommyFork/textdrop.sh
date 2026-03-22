@@ -188,17 +188,19 @@ export function PasteForm() {
 			};
 
 			if (passwordProtected) {
+				// Password-protected: wrap the data key with the password-derived key.
+				// The raw data key is NOT sent to the server — only the wrapped version.
 				const salt = generateSalt();
 				const wrapKeyObj = await deriveKeyFromPassword(password, salt);
 				const { wrappedKey, iv: wrapIv } = await wrapKey(cryptoKey, wrapKeyObj);
 				payload = {
 					...payload,
-					key: base64urlEncode(await crypto.subtle.exportKey("raw", cryptoKey)),
 					salt: base64urlEncode(salt),
 					wrappedKey,
 					wrapIv,
 				};
 			} else {
+				// Non-password: server stores the raw key so no URL hash is required.
 				payload = {
 					...payload,
 					key: base64urlEncode(await crypto.subtle.exportKey("raw", cryptoKey)),

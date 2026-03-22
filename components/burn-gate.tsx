@@ -14,6 +14,8 @@ import { PasteView } from "./paste-view";
 
 interface BurnGateProps {
 	id: string;
+	/** Passed from server metadata so we can collect the password BEFORE consuming the paste. */
+	passwordProtected?: boolean;
 }
 
 interface FetchedPaste {
@@ -37,7 +39,6 @@ interface FetchedPaste {
 type State =
 	| "confirm"
 	| "loading"
-	| { status: "password-required"; paste: FetchedPaste }
 	| {
 			status: "done";
 			paste: FetchedPaste;
@@ -47,13 +48,15 @@ type State =
 	  }
 	| "error";
 
-export function BurnGate({ id }: BurnGateProps) {
+export function BurnGate({ id, passwordProtected }: BurnGateProps) {
 	const [state, setState] = useState<State>("confirm");
 	const [error, setError] = useState<string | null>(null);
 	const [passwordInput, setPasswordInput] = useState("");
 	const [passwordError, setPasswordError] = useState<string | null>(null);
 
-	async function handleReveal() {
+	// Fetch (consuming) the paste, then decrypt it with the given key.
+	async function handleReveal(keyOverride?: string) {
+		if (passwordProtected && !keyOverride && !passwordInput) return;
 		setState("loading");
 
 		try {
@@ -64,39 +67,44 @@ export function BurnGate({ id }: BurnGateProps) {
 			}
 			const paste: FetchedPaste = await res.json();
 
+			let keyB64url: string;
+
 			if (paste.passwordProtected) {
-				setState({ status: "password-required", paste });
-				return;
+				// Password was collected before this fetch — derive the key now.
+				const saltBytes = base64urlDecode(paste.salt!);
+				const wrappingKey = await deriveKeyFromPassword(
+					passwordInput,
+					saltBytes,
+				);
+				let dataKey: CryptoKey;
+				try {
+					dataKey = await unwrapDataKey(
+						paste.wrappedKey!,
+						paste.wrapIv!,
+						wrappingKey,
+					);
+				} catch {
+					// Wrong password — paste is already consumed (burn-after-read).
+					throw new Error(
+						"Incorrect password. This paste has been permanently deleted.",
+					);
+				}
+				keyB64url = base64urlEncode(
+					await crypto.subtle.exportKey("raw", dataKey),
+				);
+			} else {
+				keyB64url = keyOverride ?? paste.key!;
 			}
 
-			await decryptPaste(paste, paste.key!);
+			await decryptPaste(paste, keyB64url);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Something went wrong");
+			const message =
+				err instanceof Error ? err.message : "Something went wrong";
+			setError(message);
+			if (passwordProtected && message.includes("password")) {
+				setPasswordError(message);
+			}
 			setState("error");
-		}
-	}
-
-	async function handlePasswordSubmit() {
-		if (typeof state !== "object" || state.status !== "password-required")
-			return;
-
-		setPasswordError(null);
-
-		try {
-			const saltBytes = base64urlDecode(state.paste.salt!);
-			const key = await deriveKeyFromPassword(passwordInput, saltBytes);
-			const dataKey = await unwrapDataKey(
-				state.paste.wrappedKey!,
-				state.paste.wrapIv!,
-				key,
-			);
-			const keyB64url = base64urlEncode(
-				await crypto.subtle.exportKey("raw", dataKey),
-			);
-
-			await decryptPaste(state.paste, keyB64url);
-		} catch {
-			setPasswordError("Incorrect password");
 		}
 	}
 
@@ -207,16 +215,22 @@ export function BurnGate({ id }: BurnGateProps) {
 
 					{state === "error" ? (
 						<p className="text-sm text-destructive">{error}</p>
-					) : typeof state === "object" &&
-						state.status === "password-required" ? (
+					) : passwordProtected && state === "confirm" ? (
 						<div className="flex flex-col items-center gap-2">
 							<p className="text-xs text-muted-foreground/60">
-								This paste is password-protected
+								This paste is password-protected. Enter the password to view and
+								burn it.
 							</p>
 							<input
 								type="password"
 								value={passwordInput}
 								onChange={(e) => setPasswordInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && passwordInput) {
+										e.preventDefault();
+										handleReveal();
+									}
+								}}
 								placeholder="Enter password..."
 								className="w-full max-w-xs rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/25 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/20"
 								autoFocus
@@ -226,21 +240,18 @@ export function BurnGate({ id }: BurnGateProps) {
 							)}
 							<button
 								type="button"
-								onClick={handlePasswordSubmit}
-								disabled={
-									!passwordInput ||
-									(typeof state === "object" &&
-										state.status !== "password-required")
-								}
+								onClick={() => handleReveal()}
+								disabled={!passwordInput}
 								className="mt-1 inline-flex h-9 items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-5 text-sm font-medium text-orange-400 transition-all hover:bg-orange-500/20 disabled:pointer-events-none disabled:opacity-50"
 							>
-								Decrypt & View
+								<Fire size={14} weight="fill" />
+								Decrypt & burn
 							</button>
 						</div>
 					) : (
 						<button
 							type="button"
-							onClick={handleReveal}
+							onClick={() => handleReveal()}
 							disabled={state === "loading"}
 							className="mt-1 inline-flex h-9 items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-5 text-sm font-medium text-orange-400 transition-all hover:bg-orange-500/20 disabled:pointer-events-none disabled:opacity-50"
 						>

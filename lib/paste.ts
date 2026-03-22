@@ -1,10 +1,6 @@
 import { nanoid } from "nanoid";
-import { ID_LENGTH, type PasteFormat } from "./constants";
+import { ID_LENGTH, MAX_CIPHERTEXT_BYTES, type PasteFormat } from "./constants";
 import { getRedis } from "./redis";
-
-// Max ciphertext size: ~7MB accounts for Base64 expansion of a 5MB plaintext
-// (AES-GCM adds 16-byte auth tag; Base64 expands ~1.37x)
-const MAX_CIPHERTEXT_BYTES = 7 * 1024 * 1024;
 
 export interface Paste {
 	id: string;
@@ -65,37 +61,24 @@ function pasteKey(id: string): string {
 }
 
 // Atomically handles both burn-after-read (GET+DEL) and normal reads (GET+INCR+SET KEEPTTL).
-// Uses Redis lock to prevent race conditions on burn-after-read pastes.
+// Redis executes Lua scripts atomically — no separate lock is needed.
 // Returns the JSON string of the paste state to return to the caller:
 //   - burn-after-read: the original value (paste is deleted)
 //   - normal: the updated value with incremented viewCount
 const LUA_GET_PASTE = `
--- Try to acquire lock with 100ms timeout
-local lockKey = KEYS[1] .. ":lock"
-local lockAcquired = redis.call('SET', lockKey, '1', 'NX', 'PX', 100)
-if not lockAcquired then
-  -- Wait and retry once
-  redis.call('PEXPIRE', lockKey, 100)
-  return false
-end
-
 local raw = redis.call('GET', KEYS[1])
-if not raw then 
-  redis.call('DEL', lockKey)
-  return false 
+if not raw then
+  return false
 end
 
 local data = cjson.decode(raw)
 if data.burnAfterRead then
-  -- Delete paste and release lock
   redis.call('DEL', KEYS[1])
-  redis.call('DEL', lockKey)
   return raw
 else
   data.viewCount = (data.viewCount or 0) + 1
   local updated = cjson.encode(data)
   redis.call('SET', KEYS[1], updated, 'KEEPTTL')
-  redis.call('DEL', lockKey)
   return updated
 end
 `;

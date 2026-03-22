@@ -40,10 +40,3 @@ export function proxy(request: NextRequest) {
 
 	return response;
 }
-
-export const config = {
-	matcher: [
-		// Apply to all routes except Next.js internals and static files
-		"/((?!_next/static|_next/image|favicon.ico).*)",
-	],
-};

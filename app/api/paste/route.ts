@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
 	EXPIRY_OPTIONS,
 	FORMAT_OPTIONS,
+	MAX_CIPHERTEXT_BYTES,
 	MAX_PASTE_SIZE_BYTES,
 	type PasteFormat,
 } from "@/lib/constants";
@@ -14,9 +15,6 @@ import { getClientIp } from "@/lib/ip";
 import { type CreatePasteInput, createPaste } from "@/lib/paste";
 import { checkPasteRateLimit } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/utils";
-
-// ~7MB: accounts for Base64URL expansion (~1.37x) of a 5MB plaintext + 16-byte GCM tag
-const MAX_CIPHERTEXT_LENGTH = 7 * 1024 * 1024;
 
 function isValidPasteBody(body: unknown): body is {
 	ciphertext: string;
@@ -57,6 +55,8 @@ function isValidPasteBody(body: unknown): body is {
 	}
 
 	if (b.passwordProtected) {
+		// Password-protected pastes: only the wrapped key (encrypted with the
+		// password-derived key) is sent. The raw data key must never reach the server.
 		if (
 			typeof b.salt !== "string" ||
 			typeof b.wrappedKey !== "string" ||
@@ -64,10 +64,8 @@ function isValidPasteBody(body: unknown): body is {
 		) {
 			return false;
 		}
-		if (typeof b.key !== "string") {
-			return false;
-		}
 	} else {
+		// Non-password pastes: server stores the raw key so the URL doesn't need a hash.
 		if (typeof b.key !== "string" || b.key.length === 0) {
 			return false;
 		}
@@ -137,7 +135,7 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
-		if (body.ciphertext.length > MAX_CIPHERTEXT_LENGTH) {
+		if (body.ciphertext.length > MAX_CIPHERTEXT_BYTES) {
 			return createErrorResponse(
 				"Content exceeds maximum size of 5MB",
 				400,
@@ -157,7 +155,8 @@ export async function POST(request: NextRequest) {
 			burnAfterRead: Boolean(body.burnAfterRead),
 			sizeBytes: body.sizeBytes,
 			passwordProtected: body.passwordProtected,
-			key: body.key,
+			// For non-password pastes only — raw key must not be stored for password-protected pastes
+			key: body.passwordProtected ? undefined : body.key,
 			salt: body.salt,
 			wrappedKey: body.wrappedKey,
 			wrapIv: body.wrapIv,

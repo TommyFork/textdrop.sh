@@ -60,7 +60,15 @@ export function PasteClientPage({ id }: { id: string }) {
 			);
 			workerRef.current = worker;
 
+			const timeout = setTimeout(() => {
+				if (cancelledRef.current) return;
+				worker.terminate();
+				workerRef.current = null;
+				setState({ status: "error", message: "Decryption timed out" });
+			}, 10000);
+
 			worker.onmessage = (event: MessageEvent<RenderResponse>) => {
+				clearTimeout(timeout);
 				if (cancelledRef.current) return;
 				if (event.data.type === "success") {
 					setState({
@@ -78,6 +86,7 @@ export function PasteClientPage({ id }: { id: string }) {
 			};
 
 			worker.onerror = (err) => {
+				clearTimeout(timeout);
 				if (cancelledRef.current) return;
 				setState({ status: "error", message: err.message || "Worker error" });
 				worker.terminate();
@@ -135,17 +144,6 @@ export function PasteClientPage({ id }: { id: string }) {
 			}
 
 			const paste: PasteData = await res.json();
-
-			if (paste.burnAfterRead) {
-				if (!cancelledRef.current)
-					setState({
-						status: "done",
-						paste,
-						html: "",
-						plaintext: "",
-					});
-				return;
-			}
 
 			if (paste.passwordProtected) {
 				if (!cancelledRef.current)

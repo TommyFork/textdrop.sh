@@ -2,7 +2,7 @@
 // Runs in WorkerGlobalScope — no DOM, no React, no Node.js.
 // crypto.subtle is available natively in WorkerGlobalScope.
 
-import { marked } from "marked";
+import { Marked } from "marked";
 import { base64urlDecode, base64urlEncode } from "@/lib/crypto";
 
 export type RenderRequest = {
@@ -42,8 +42,18 @@ async function renderCode(code: string, lang: string): Promise<string> {
 	return hl.codeToHtml(code, { lang: safeLang, theme: "tokyo-night" });
 }
 
+// Isolated marked instance with raw-HTML stripped.
+// WorkerGlobalScope has no DOM so DOMPurify is unavailable; we drop all raw
+// HTML tokens from the source and rely on marked's own safe renderer output.
+const safeMarked = new Marked({
+	gfm: true,
+	renderer: {
+		html: () => "",
+	},
+});
+
 async function renderMarkdown(md: string): Promise<string> {
-	const html = await marked.parse(md, { async: true, gfm: true });
+	const html = await safeMarked.parse(md);
 	return `<div class="markdown-body">${html}</div>`;
 }
 

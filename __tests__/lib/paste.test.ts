@@ -206,6 +206,81 @@ describe("paste", () => {
 			const stored = JSON.parse(mockRedis.store["paste:testid1234"]);
 			expect(stored.language).toBe("typescript");
 		});
+
+		it("creates a burn-after-read paste with burnAfterRead: true", async () => {
+			const result = await createPaste({
+				ciphertext: TEST_CIPHERTEXT,
+				iv: TEST_IV,
+				format: "plain",
+				expirySeconds: 0,
+				burnAfterRead: true,
+				sizeBytes: 4,
+				passwordProtected: false,
+			});
+
+			expect(result.burnAfterRead).toBe(true);
+			const stored = JSON.parse(mockRedis.store["paste:testid1234"]);
+			expect(stored.burnAfterRead).toBe(true);
+		});
+
+		it("stores wrappedKey, salt, and wrapIv for a password-protected paste", async () => {
+			const result = await createPaste({
+				ciphertext: TEST_CIPHERTEXT,
+				iv: TEST_IV,
+				format: "plain",
+				expirySeconds: 0,
+				burnAfterRead: false,
+				sizeBytes: 4,
+				passwordProtected: true,
+				salt: "salt-base64url",
+				wrappedKey: "wrapped-key-base64url",
+				wrapIv: "wrap-iv-base64url",
+			});
+
+			expect(result.passwordProtected).toBe(true);
+			expect(result.salt).toBe("salt-base64url");
+			expect(result.wrappedKey).toBe("wrapped-key-base64url");
+			expect(result.wrapIv).toBe("wrap-iv-base64url");
+
+			const stored = JSON.parse(mockRedis.store["paste:testid1234"]);
+			expect(stored.salt).toBe("salt-base64url");
+			expect(stored.wrappedKey).toBe("wrapped-key-base64url");
+			expect(stored.wrapIv).toBe("wrap-iv-base64url");
+		});
+
+		it("does NOT store a raw key for password-protected pastes", async () => {
+			await createPaste({
+				ciphertext: TEST_CIPHERTEXT,
+				iv: TEST_IV,
+				format: "plain",
+				expirySeconds: 0,
+				burnAfterRead: false,
+				sizeBytes: 4,
+				passwordProtected: true,
+				salt: "salt-base64url",
+				wrappedKey: "wrapped-key-base64url",
+				wrapIv: "wrap-iv-base64url",
+				key: undefined, // must not be stored even if caller passes it
+			});
+
+			const stored = JSON.parse(mockRedis.store["paste:testid1234"]);
+			expect(stored.key).toBeUndefined();
+		});
+
+		it("throws when ciphertext exceeds MAX_CIPHERTEXT_BYTES", async () => {
+			const oversized = "x".repeat(7 * 1024 * 1024 + 1);
+			await expect(
+				createPaste({
+					ciphertext: oversized,
+					iv: TEST_IV,
+					format: "plain",
+					expirySeconds: 0,
+					burnAfterRead: false,
+					sizeBytes: 4,
+					passwordProtected: false,
+				}),
+			).rejects.toThrow(/exceeds maximum size/i);
+		});
 	});
 
 	describe("getPaste", () => {
@@ -342,6 +417,54 @@ describe("paste", () => {
 		it("returns null for corrupt JSON", async () => {
 			mockRedis.store["paste:bad"] = "{{invalid}}";
 			expect(await getPasteMetadata("bad")).toBeNull();
+		});
+
+		it("excludes key, salt, wrappedKey, and wrapIv from metadata", async () => {
+			mockRedis.store["paste:pw1"] = JSON.stringify({
+				id: "pw1",
+				ciphertext: TEST_CIPHERTEXT,
+				iv: TEST_IV,
+				format: "plain",
+				createdAt: 1000,
+				expiresAt: null,
+				burnAfterRead: false,
+				viewCount: 0,
+				sizeBytes: 4,
+				passwordProtected: true,
+				key: "super-secret-key",
+				salt: "salt-value",
+				wrappedKey: "wrapped-value",
+				wrapIv: "wrap-iv-value",
+			});
+
+			const result = await getPasteMetadata("pw1");
+			expect(result).not.toBeNull();
+			expect(result).not.toHaveProperty("key");
+			expect(result).not.toHaveProperty("salt");
+			expect(result).not.toHaveProperty("wrappedKey");
+			expect(result).not.toHaveProperty("wrapIv");
+		});
+
+		it("includes the passwordProtected flag in metadata", async () => {
+			mockRedis.store["paste:pw2"] = JSON.stringify({
+				id: "pw2",
+				ciphertext: TEST_CIPHERTEXT,
+				iv: TEST_IV,
+				format: "plain",
+				createdAt: 1000,
+				expiresAt: null,
+				burnAfterRead: false,
+				viewCount: 0,
+				sizeBytes: 4,
+				passwordProtected: true,
+				salt: "salt-value",
+				wrappedKey: "wrapped-value",
+				wrapIv: "wrap-iv-value",
+			});
+
+			const result = await getPasteMetadata("pw2");
+			expect(result).not.toBeNull();
+			expect(result!.passwordProtected).toBe(true);
 		});
 	});
 });

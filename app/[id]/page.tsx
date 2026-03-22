@@ -37,7 +37,7 @@ export default async function ViewPaste({ params }: PageProps) {
 	return (
 		<div className="min-h-svh px-4 py-4 md:py-8">
 			{metadata.burnAfterRead ? (
-				<BurnGate id={id} />
+				<BurnGate id={id} passwordProtected={metadata.passwordProtected} />
 			) : (
 				<PasteClientPage id={id} />
 			)}
