@@ -1,40 +1,90 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
 	EXPIRY_OPTIONS,
 	FORMAT_OPTIONS,
+	MAX_CIPHERTEXT_BYTES,
 	MAX_PASTE_SIZE_BYTES,
 	type PasteFormat,
 } from "@/lib/constants";
+import {
+	createErrorResponse,
+	createJsonResponse,
+	logApiError,
+} from "@/lib/error";
 import { getClientIp } from "@/lib/ip";
 import { type CreatePasteInput, createPaste } from "@/lib/paste";
 import { checkPasteRateLimit } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/utils";
 
 function isValidPasteBody(body: unknown): body is {
-	content: string;
+	ciphertext: string;
+	iv: string;
 	format: PasteFormat;
 	language?: string;
 	expirySeconds: number;
 	burnAfterRead?: boolean;
+	sizeBytes: number;
+	passwordProtected: boolean;
+	key?: string;
+	salt?: string;
+	wrappedKey?: string;
+	wrapIv?: string;
 } {
-	if (typeof body !== "object" || body === null) {
-		return false;
-	}
+	if (typeof body !== "object" || body === null) return false;
 
 	const b = body as Record<string, unknown>;
 
-	// Validate content
-	if (typeof b.content !== "string" || b.content.length === 0) {
+	if (typeof b.ciphertext !== "string" || b.ciphertext.length === 0) {
 		return false;
 	}
 
-	// Validate format
+	if (typeof b.iv !== "string" || b.iv.length === 0) {
+		return false;
+	}
+
+	if (typeof b.passwordProtected !== "boolean") {
+		return false;
+	}
+
+	if (
+		typeof b.sizeBytes !== "number" ||
+		b.sizeBytes < 0 ||
+		b.sizeBytes > MAX_PASTE_SIZE_BYTES
+	) {
+		return false;
+	}
+
+	if (b.passwordProtected) {
+		// Password-protected pastes: only the wrapped key (encrypted with the
+		// password-derived key) is sent. The raw data key must never reach the server.
+		if (
+			typeof b.salt !== "string" ||
+			typeof b.wrappedKey !== "string" ||
+			typeof b.wrapIv !== "string"
+		) {
+			return false;
+		}
+	} else {
+		// Non-password pastes: server stores the raw key so the URL doesn't need a hash.
+		if (typeof b.key !== "string" || b.key.length === 0) {
+			return false;
+		}
+	}
+
+	// iv must decode to exactly 12 bytes (AES-GCM NIST recommendation)
+	try {
+		const ivPadded = b.iv.replace(/-/g, "+").replace(/_/g, "/");
+		const decoded = atob(
+			ivPadded + "=".repeat((4 - (ivPadded.length % 4)) % 4),
+		);
+		if (decoded.length !== 12) return false;
+	} catch {
+		return false;
+	}
+
 	const validFormats = FORMAT_OPTIONS.map((f) => f.value);
-	if (!validFormats.includes(b.format as PasteFormat)) {
-		return false;
-	}
+	if (!validFormats.includes(b.format as PasteFormat)) return false;
 
-	// Validate expiry
 	const validExpiries = EXPIRY_OPTIONS.map((e) => e.value);
 	if (
 		typeof b.expirySeconds !== "number" ||
@@ -43,11 +93,8 @@ function isValidPasteBody(body: unknown): body is {
 		return false;
 	}
 
-	// Validate language if provided and format is code
 	if (b.format === "code" && b.language !== undefined) {
-		if (typeof b.language !== "string") {
-			return false;
-		}
+		if (typeof b.language !== "string") return false;
 	}
 
 	return true;
@@ -59,16 +106,16 @@ export async function POST(request: NextRequest) {
 		const rateLimit = await checkPasteRateLimit(ip);
 
 		if (!rateLimit.allowed) {
-			return NextResponse.json(
-				{ error: "Rate limit exceeded. Try again later." },
+			return createErrorResponse(
+				"Rate limit exceeded. Try again later.",
+				429,
+				"RATE_LIMIT_EXCEEDED",
 				{
-					status: 429,
-					headers: {
-						"Retry-After": String(
-							rateLimit.resetAt - Math.floor(Date.now() / 1000),
-						),
-						"X-RateLimit-Remaining": String(rateLimit.remaining),
-					},
+					"Retry-After": String(
+						rateLimit.resetAt - Math.floor(Date.now() / 1000),
+					),
+					"X-RateLimit-Remaining": String(rateLimit.remaining),
+					"Access-Control-Allow-Origin": "*",
 				},
 			);
 		}
@@ -77,50 +124,71 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+			return createErrorResponse("Invalid JSON body", 400, "INVALID_JSON", {
+				"Access-Control-Allow-Origin": "*",
+			});
 		}
 
 		if (!isValidPasteBody(body)) {
-			return NextResponse.json(
-				{ error: "Invalid request body" },
-				{ status: 400 },
-			);
+			return createErrorResponse("Invalid request body", 400, "INVALID_BODY", {
+				"Access-Control-Allow-Origin": "*",
+			});
 		}
 
-		// Additional validation: content size
-		if (Buffer.byteLength(body.content, "utf8") > MAX_PASTE_SIZE_BYTES) {
-			return NextResponse.json(
-				{ error: `Content exceeds maximum size of 5MB` },
-				{ status: 400 },
+		if (body.ciphertext.length > MAX_CIPHERTEXT_BYTES) {
+			return createErrorResponse(
+				"Content exceeds maximum size of 5MB",
+				400,
+				"CONTENT_TOO_LARGE",
+				{
+					"Access-Control-Allow-Origin": "*",
+				},
 			);
 		}
 
 		const input: CreatePasteInput = {
-			content: body.content,
+			ciphertext: body.ciphertext,
+			iv: body.iv,
 			format: body.format,
 			language: body.format === "code" ? body.language : undefined,
 			expirySeconds: body.expirySeconds,
 			burnAfterRead: Boolean(body.burnAfterRead),
+			sizeBytes: body.sizeBytes,
+			passwordProtected: body.passwordProtected,
+			// For non-password pastes only — raw key must not be stored for password-protected pastes
+			key: body.passwordProtected ? undefined : body.key,
+			salt: body.salt,
+			wrappedKey: body.wrappedKey,
+			wrapIv: body.wrapIv,
 		};
 
 		const paste = await createPaste(input);
 		const baseUrl = getBaseUrl(request.url);
 
-		return NextResponse.json(
+		// Note: the hash fragment (#KEY) is appended client-side — the server
+		// never knows the encryption key.
+		return createJsonResponse(
 			{
 				id: paste.id,
 				url: `${baseUrl}/${paste.id}`,
-				rawUrl: `${baseUrl}/text/${paste.id}`,
 				expiresAt: paste.expiresAt,
 				sizeBytes: paste.sizeBytes,
+				passwordProtected: paste.passwordProtected,
 			},
-			{ status: 201 },
+			201,
+			{
+				"Access-Control-Allow-Origin": "*",
+			},
 		);
 	} catch (error) {
-		console.error("Error creating paste:", error);
-		return NextResponse.json(
-			{ error: "Failed to create paste" },
-			{ status: 500 },
+		logApiError("creating paste", error);
+		return createErrorResponse(
+			"Failed to create paste",
+			500,
+			"INTERNAL_ERROR",
+			{
+				"Access-Control-Allow-Origin": "*",
+			},
 		);
 	}
 }

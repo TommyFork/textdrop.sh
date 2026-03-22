@@ -4,6 +4,7 @@ import {
 	CircleNotch,
 	Code,
 	Fire,
+	Lock,
 	MarkdownLogo,
 	TextT,
 } from "@phosphor-icons/react";
@@ -31,6 +32,14 @@ import {
 	type PasteFormat,
 	POPULAR_LANGUAGES,
 } from "@/lib/constants";
+import {
+	base64urlEncode,
+	deriveKeyFromPassword,
+	encrypt,
+	generateKey,
+	generateSalt,
+	wrapKey,
+} from "@/lib/crypto";
 import { formatBytes } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ShareModal } from "./share-modal";
@@ -41,16 +50,19 @@ interface PasteResult {
 	id: string;
 	expiresAt: number | null;
 	sizeBytes: number;
+	passwordProtected: boolean;
 }
+
+import { FORMAT_OPTIONS as BASE_FORMAT_OPTIONS } from "@/lib/constants";
 
 const FORMAT_OPTIONS: {
 	value: PasteFormat;
 	label: string;
 	icon: React.ReactNode;
 }[] = [
-	{ value: "plain", label: "Plain Text", icon: <TextT size={14} /> },
-	{ value: "markdown", label: "Markdown", icon: <MarkdownLogo size={14} /> },
-	{ value: "code", label: "Code", icon: <Code size={14} /> },
+	{ ...BASE_FORMAT_OPTIONS[0], icon: <TextT size={14} /> },
+	{ ...BASE_FORMAT_OPTIONS[1], icon: <MarkdownLogo size={14} /> },
+	{ ...BASE_FORMAT_OPTIONS[2], icon: <Code size={14} /> },
 ];
 
 function displayLang(lang: string): string {
@@ -93,6 +105,8 @@ export function PasteForm() {
 	const [language, setLanguage] = useState("typescript");
 	const [expirySeconds, setExpirySeconds] = useState(DEFAULT_EXPIRY_VALUE);
 	const [burnAfterRead, setBurnAfterRead] = useState(false);
+	const [passwordProtected, setPasswordProtected] = useState(false);
+	const [password, setPassword] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [result, setResult] = useState<PasteResult | null>(null);
@@ -136,7 +150,7 @@ export function PasteForm() {
 	}, [format]);
 
 	const { sizeBytes, sizeOverLimit, lineCount } = useMemo(() => {
-		const sizeBytes = Buffer.byteLength(content, "utf8");
+		const sizeBytes = new TextEncoder().encode(content).byteLength;
 		return {
 			sizeBytes,
 			sizeOverLimit: sizeBytes > MAX_PASTE_SIZE_BYTES,
@@ -144,25 +158,59 @@ export function PasteForm() {
 		};
 	}, [content]);
 
-	const isSubmitDisabled = !content.trim() || loading || sizeOverLimit;
+	const isSubmitDisabled =
+		!content.trim() ||
+		loading ||
+		sizeOverLimit ||
+		(passwordProtected && !password);
 
 	const handleSubmit = useCallback(async () => {
 		if (!content.trim() || loading || sizeOverLimit) return;
+		if (passwordProtected && !password) return;
 
 		setLoading(true);
 		setError(null);
 
 		try {
+			const { cryptoKey } = await generateKey();
+			const sizeBytes = new TextEncoder().encode(content).byteLength;
+			const { ciphertext, iv } = await encrypt(cryptoKey, content);
+
+			let payload: Record<string, unknown> = {
+				ciphertext,
+				iv,
+				format,
+				language: format === "code" ? language : undefined,
+				expirySeconds,
+				burnAfterRead,
+				sizeBytes,
+				passwordProtected,
+			};
+
+			if (passwordProtected) {
+				// Password-protected: wrap the data key with the password-derived key.
+				// The raw data key is NOT sent to the server — only the wrapped version.
+				const salt = generateSalt();
+				const wrapKeyObj = await deriveKeyFromPassword(password, salt);
+				const { wrappedKey, iv: wrapIv } = await wrapKey(cryptoKey, wrapKeyObj);
+				payload = {
+					...payload,
+					salt: base64urlEncode(salt),
+					wrappedKey,
+					wrapIv,
+				};
+			} else {
+				// Non-password: server stores the raw key so no URL hash is required.
+				payload = {
+					...payload,
+					key: base64urlEncode(await crypto.subtle.exportKey("raw", cryptoKey)),
+				};
+			}
+
 			const res = await fetch("/api/paste", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					content,
-					format,
-					language: format === "code" ? language : undefined,
-					expirySeconds,
-					burnAfterRead,
-				}),
+				body: JSON.stringify(payload),
 			});
 
 			if (!res.ok) {
@@ -175,6 +223,7 @@ export function PasteForm() {
 				id: data.id,
 				expiresAt: data.expiresAt,
 				sizeBytes: data.sizeBytes,
+				passwordProtected: data.passwordProtected,
 			});
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Something went wrong");
@@ -187,6 +236,8 @@ export function PasteForm() {
 		language,
 		expirySeconds,
 		burnAfterRead,
+		passwordProtected,
+		password,
 		loading,
 		sizeOverLimit,
 	]);
@@ -209,11 +260,14 @@ export function PasteForm() {
 		return (
 			<ShareModal
 				id={result.id}
+				passwordProtected={result.passwordProtected}
 				expiresAt={result.expiresAt}
 				sizeBytes={result.sizeBytes}
 				onCreateAnother={() => {
 					setResult(null);
 					setContent("");
+					setPassword("");
+					setPasswordProtected(false);
 					setTimeout(() => textareaRef.current?.focus(), 0);
 				}}
 			/>
@@ -349,6 +403,36 @@ export function PasteForm() {
 					<Fire size={13} weight={burnAfterRead ? "fill" : "regular"} />
 					Burn after read
 				</Button>
+
+				{/* Password toggle */}
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={() => {
+						setPasswordProtected(!passwordProtected);
+						if (passwordProtected) setPassword("");
+					}}
+					className={cn(
+						"h-8 gap-1.5 rounded-full border px-3 text-xs font-medium transition-all cursor-pointer",
+						passwordProtected
+							? "border-orange-500/40 bg-orange-500/10 text-orange-400 hover:bg-orange-500/15 hover:text-orange-400"
+							: "border-white/[0.08] bg-white/[0.04] text-muted-foreground hover:bg-white/[0.07] hover:text-foreground",
+					)}
+				>
+					<Lock size={13} weight={passwordProtected ? "fill" : "regular"} />
+					Password
+				</Button>
+
+				{/* Password input */}
+				{passwordProtected && (
+					<input
+						type="password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="Password..."
+						className="h-8 min-w-[120px] flex-1 max-w-48 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-xs text-foreground placeholder:text-muted-foreground/25 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+					/>
+				)}
 
 				<div className="flex-1" />
 

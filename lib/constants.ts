@@ -1,4 +1,6 @@
 export const MAX_PASTE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+// ~7MB: accounts for Base64URL expansion (~1.37×) of a 5MB plaintext + 16-byte GCM auth tag
+export const MAX_CIPHERTEXT_BYTES = 7 * 1024 * 1024;
 export const MAX_PASTE_SIZE_LABEL = "5MB";
 export const DEFAULT_EXPIRY_SECONDS = 30 * 24 * 60 * 60; // 30 days
 export const ID_LENGTH = 6;
@@ -18,6 +20,11 @@ export const FORMAT_OPTIONS = [
 	{ label: "Markdown", value: "markdown" },
 	{ label: "Code", value: "code" },
 ] as const;
+
+export interface FormatOption {
+	label: string;
+	value: PasteFormat;
+}
 
 export type PasteFormat = "plain" | "markdown" | "code";
 

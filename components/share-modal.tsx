@@ -1,12 +1,19 @@
 "use client";
 
-import { ArrowSquareOut, Link, TextT } from "@phosphor-icons/react";
+import { ArrowSquareOut, Info, Link, Lock } from "@phosphor-icons/react";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatBytes } from "@/lib/format";
 import { formatDate, getBaseUrl } from "@/lib/utils";
 import { CopyButton } from "./copy-button";
 
 interface ShareModalProps {
 	id: string;
+	passwordProtected: boolean;
 	expiresAt: number | null;
 	sizeBytes: number;
 	onCreateAnother: () => void;
@@ -14,13 +21,13 @@ interface ShareModalProps {
 
 export function ShareModal({
 	id,
+	passwordProtected,
 	expiresAt,
 	sizeBytes,
 	onCreateAnother,
 }: ShareModalProps) {
 	const baseUrl = getBaseUrl();
-	const styledUrl = `${baseUrl}/${id}`;
-	const rawUrl = `${baseUrl}/text/${id}`;
+	const url = `${baseUrl}/${id}`;
 
 	return (
 		<div className="animate-in fade-in slide-in-from-bottom-3 mx-auto w-full max-w-lg overflow-hidden rounded-xl border border-white/[0.07] bg-card shadow-[0_0_0_1px_oklch(1_0_0/0.03),0_32px_64px_-16px_oklch(0_0_0/0.7)]">
@@ -36,14 +43,14 @@ export function ShareModal({
 					<div>
 						<label className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground/50">
 							<Link size={11} />
-							Styled link
+							Share link
 						</label>
 						<div className="flex items-center gap-2">
 							<code className="flex-1 truncate rounded-lg border border-white/[0.07] bg-white/[0.04] px-3 py-2 text-xs text-foreground/80">
-								{styledUrl}
+								{url}
 							</code>
 							<a
-								href={styledUrl}
+								href={url}
 								target="_blank"
 								rel="noopener noreferrer"
 								className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
@@ -51,31 +58,24 @@ export function ShareModal({
 							>
 								<ArrowSquareOut size={16} />
 							</a>
-							<CopyButton text={styledUrl} label="Copy styled link" />
+							<CopyButton text={url} label="Copy link" />
 						</div>
 					</div>
 
-					<div>
-						<label className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground/50">
-							<TextT size={11} />
-							Raw text
-						</label>
-						<div className="flex items-center gap-2">
-							<code className="flex-1 truncate rounded-lg border border-white/[0.07] bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground/50">
-								{rawUrl}
-							</code>
-							<a
-								href={rawUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-								title="Open in new tab"
-							>
-								<ArrowSquareOut size={16} />
-							</a>
-							<CopyButton text={rawUrl} label="Copy raw link" />
-						</div>
-					</div>
+					<TooltipProvider>
+						{passwordProtected && (
+							<div className="flex items-center gap-1.5 text-xs text-orange-400/50">
+								<Lock size={11} weight="fill" />
+								<span>end-to-end encrypted</span>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Info size={11} className="cursor-default" />
+									</TooltipTrigger>
+									<TooltipContent>Share password separately</TooltipContent>
+								</Tooltip>
+							</div>
+						)}
+					</TooltipProvider>
 				</div>
 
 				<div className="mt-4 flex items-center justify-between text-xs text-muted-foreground/35">

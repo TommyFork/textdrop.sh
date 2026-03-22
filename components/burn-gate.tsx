@@ -3,15 +3,25 @@
 import { Fire } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { PasteFormat } from "@/lib/constants";
+import {
+	base64urlDecode,
+	base64urlEncode,
+	deriveKeyFromPassword,
+	unwrapDataKey,
+} from "@/lib/crypto";
+import type { RenderRequest, RenderResponse } from "@/workers/render.worker";
 import { PasteView } from "./paste-view";
 
 interface BurnGateProps {
 	id: string;
+	/** Passed from server metadata so we can collect the password BEFORE consuming the paste. */
+	passwordProtected?: boolean;
 }
 
 interface FetchedPaste {
 	id: string;
-	content: string;
+	ciphertext: string;
+	iv: string;
 	format: PasteFormat;
 	language?: string;
 	createdAt: number;
@@ -19,34 +29,159 @@ interface FetchedPaste {
 	burnAfterRead: boolean;
 	viewCount: number;
 	sizeBytes: number;
+	passwordProtected: boolean;
+	key?: string;
+	salt?: string;
+	wrappedKey?: string;
+	wrapIv?: string;
 }
 
-export function BurnGate({ id }: BurnGateProps) {
-	const [state, setState] = useState<
-		"confirm" | "loading" | "revealed" | "error"
-	>("confirm");
-	const [paste, setPaste] = useState<FetchedPaste | null>(null);
-	const [error, setError] = useState<string | null>(null);
+type State =
+	| "confirm"
+	| "loading"
+	| {
+			status: "done";
+			paste: FetchedPaste;
+			html: string;
+			plaintext: string;
+			keyB64url: string;
+	  }
+	| "error";
 
-	async function handleReveal() {
+export function BurnGate({ id, passwordProtected }: BurnGateProps) {
+	const [state, setState] = useState<State>("confirm");
+	const [error, setError] = useState<string | null>(null);
+	const [passwordInput, setPasswordInput] = useState("");
+	const [passwordError, setPasswordError] = useState<string | null>(null);
+
+	// Fetch (consuming) the paste, then decrypt it with the given key.
+	async function handleReveal(keyOverride?: string) {
+		if (passwordProtected && !keyOverride && !passwordInput) return;
 		setState("loading");
+
 		try {
 			const res = await fetch(`/api/paste/${id}`);
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
 				throw new Error(data.error ?? "Paste not found or already viewed");
 			}
-			const data: FetchedPaste = await res.json();
-			setPaste(data);
-			setState("revealed");
+			const paste: FetchedPaste = await res.json();
+
+			let keyB64url: string;
+
+			if (paste.passwordProtected) {
+				// Password was collected before this fetch — derive the key now.
+				const saltBytes = base64urlDecode(paste.salt!);
+				const wrappingKey = await deriveKeyFromPassword(
+					passwordInput,
+					saltBytes,
+				);
+				let dataKey: CryptoKey;
+				try {
+					dataKey = await unwrapDataKey(
+						paste.wrappedKey!,
+						paste.wrapIv!,
+						wrappingKey,
+					);
+				} catch {
+					// Wrong password — paste is already consumed (burn-after-read).
+					throw new Error(
+						"Incorrect password. This paste has been permanently deleted.",
+					);
+				}
+				keyB64url = base64urlEncode(
+					await crypto.subtle.exportKey("raw", dataKey),
+				);
+			} else {
+				keyB64url = keyOverride ?? paste.key!;
+			}
+
+			await decryptPaste(paste, keyB64url);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Something went wrong");
+			const message =
+				err instanceof Error ? err.message : "Something went wrong";
+			setError(message);
+			if (passwordProtected && message.includes("password")) {
+				setPasswordError(message);
+			}
 			setState("error");
 		}
 	}
 
-	if (state === "revealed" && paste) {
-		return <PasteView paste={paste} />;
+	async function decryptPaste(paste: FetchedPaste, keyB64url: string) {
+		await new Promise<void>((resolve, reject) => {
+			let worker: Worker | null = null;
+			let cleanupTimeout: NodeJS.Timeout | null = null;
+
+			const cleanup = () => {
+				if (worker) {
+					worker.terminate();
+					worker = null;
+				}
+				if (cleanupTimeout) {
+					clearTimeout(cleanupTimeout);
+					cleanupTimeout = null;
+				}
+			};
+
+			try {
+				worker = new Worker(
+					new URL("../workers/render.worker.ts", import.meta.url),
+					{ type: "module" },
+				);
+
+				cleanupTimeout = setTimeout(() => {
+					cleanup();
+					reject(new Error("Worker timeout"));
+				}, 10000);
+
+				worker.onmessage = (event: MessageEvent<RenderResponse>) => {
+					cleanup();
+					if (event.data.type === "success") {
+						history.replaceState(null, "", window.location.pathname);
+						setState({
+							status: "done",
+							paste,
+							html: event.data.html,
+							plaintext: event.data.plaintext,
+							keyB64url,
+						});
+						resolve();
+					} else {
+						reject(new Error(event.data.message));
+					}
+				};
+
+				worker.onerror = (err) => {
+					cleanup();
+					reject(new Error(err.message || "Worker error"));
+				};
+
+				const req: RenderRequest = {
+					type: "render",
+					ciphertext: paste.ciphertext,
+					iv: paste.iv,
+					keyB64url,
+					format: paste.format,
+					language: paste.language,
+				};
+				worker.postMessage(req);
+			} catch (err) {
+				cleanup();
+				throw err;
+			}
+		});
+	}
+
+	if (typeof state === "object" && state.status === "done") {
+		return (
+			<PasteView
+				paste={state.paste}
+				html={state.html}
+				plaintext={state.plaintext}
+				keyB64url={state.keyB64url}
+			/>
+		);
 	}
 
 	return (
@@ -80,15 +215,48 @@ export function BurnGate({ id }: BurnGateProps) {
 
 					{state === "error" ? (
 						<p className="text-sm text-destructive">{error}</p>
+					) : passwordProtected && state === "confirm" ? (
+						<div className="flex flex-col items-center gap-2">
+							<p className="text-xs text-muted-foreground/60">
+								This paste is password-protected. Enter the password to view and
+								burn it.
+							</p>
+							<input
+								type="password"
+								value={passwordInput}
+								onChange={(e) => setPasswordInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && passwordInput) {
+										e.preventDefault();
+										handleReveal();
+									}
+								}}
+								placeholder="Enter password..."
+								className="w-full max-w-xs rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/25 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+								autoFocus
+							/>
+							{passwordError && (
+								<p className="text-xs text-destructive">{passwordError}</p>
+							)}
+							<button
+								type="button"
+								onClick={() => handleReveal()}
+								disabled={!passwordInput}
+								className="mt-1 inline-flex h-9 items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-5 text-sm font-medium text-orange-400 transition-all hover:bg-orange-500/20 disabled:pointer-events-none disabled:opacity-50"
+							>
+								<Fire size={14} weight="fill" />
+								Decrypt & burn
+							</button>
+						</div>
 					) : (
 						<button
 							type="button"
-							onClick={handleReveal}
+							onClick={() => handleReveal()}
 							disabled={state === "loading"}
 							className="mt-1 inline-flex h-9 items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-5 text-sm font-medium text-orange-400 transition-all hover:bg-orange-500/20 disabled:pointer-events-none disabled:opacity-50"
 						>
 							<Fire size={14} weight="fill" />
-							{state === "loading" ? "Loading..." : "View & burn"}
+							{state === "loading" ? "Decrypting..." : "View & burn"}
 						</button>
 					)}
 				</div>
