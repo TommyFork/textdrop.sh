@@ -102,7 +102,7 @@ export function PasteView({
 									<span className="ml-1">burned</span>
 								</Badge>
 							</TooltipTrigger>
-							<TooltipContent>
+							<TooltipContent side="top">
 								This paste has been permanently deleted
 							</TooltipContent>
 						</Tooltip>

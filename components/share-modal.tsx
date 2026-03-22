@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowSquareOut, Link, Lock, LockOpen } from "@phosphor-icons/react";
+import { ArrowSquareOut, Info, Link, Lock } from "@phosphor-icons/react";
 import { formatBytes } from "@/lib/format";
 import { formatDate, getBaseUrl } from "@/lib/utils";
 import { CopyButton } from "./copy-button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ShareModalProps {
 	id: string;
@@ -56,28 +57,19 @@ export function ShareModal({
 						</div>
 					</div>
 
-					{passwordProtected ? (
-						<div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3">
-							<div className="flex items-center gap-2 text-xs text-orange-400">
-								<Lock size={14} weight="fill" />
-								<span className="font-medium">End-to-end encrypted</span>
+					{passwordProtected && (
+						<TooltipProvider>
+							<div className="flex items-center gap-1.5 text-xs text-orange-400/50">
+								<Lock size={11} weight="fill" />
+								<span>end-to-end encrypted</span>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Info size={11} className="cursor-default" />
+									</TooltipTrigger>
+									<TooltipContent>Share password separately</TooltipContent>
+								</Tooltip>
 							</div>
-							<p className="mt-1.5 text-xs text-muted-foreground/60">
-								Recipients will need the password to decrypt this paste. Share
-								the password through a separate secure channel.
-							</p>
-						</div>
-					) : (
-						<div className="rounded-lg border border-white/[0.07] bg-white/[0.04] p-3">
-							<div className="flex items-center gap-2 text-xs text-muted-foreground/60">
-								<LockOpen size={14} />
-								<span className="font-medium">Server-side encryption</span>
-							</div>
-							<p className="mt-1.5 text-xs text-muted-foreground/60">
-								This paste is encrypted on the server. Use a password for
-								end-to-end encryption.
-							</p>
-						</div>
+						</TooltipProvider>
 					)}
 				</div>
 

@@ -421,6 +421,17 @@ export function PasteForm() {
 					Password
 				</Button>
 
+				{/* Password input */}
+				{passwordProtected && (
+					<input
+						type="password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="Password..."
+						className="h-8 min-w-[120px] flex-1 max-w-48 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 text-xs text-foreground placeholder:text-muted-foreground/25 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/20"
+					/>
+				)}
+
 				<div className="flex-1" />
 
 				{/* Size / line count */}
@@ -462,20 +473,6 @@ export function PasteForm() {
 					)}
 				</Button>
 			</div>
-
-			{/* Password input */}
-			{passwordProtected && (
-				<div className="mt-3 flex items-center gap-2">
-					<input
-						type="password"
-						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						placeholder="Enter password for this paste..."
-						className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/25 focus:border-orange-500/40 focus:outline-none focus:ring-1 focus:ring-orange-500/20"
-						autoFocus
-					/>
-				</div>
-			)}
 
 			{/* Error */}
 			{error && (
