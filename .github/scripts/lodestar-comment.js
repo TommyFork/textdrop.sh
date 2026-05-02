@@ -57,6 +57,16 @@ async function fetchAtom(commitHash) {
   }
 }
 
+// JSONB fields may be single- or double-encoded depending on server version
+function parseJson(value, fallback) {
+  try {
+    const once = JSON.parse(value);
+    return typeof once === "string" ? JSON.parse(once) : once;
+  } catch {
+    return fallback;
+  }
+}
+
 function confidenceBadge(confidence) {
   if (confidence === "high") return "🟢 high";
   if (confidence === "medium") return "🟡 medium";
@@ -64,10 +74,10 @@ function confidenceBadge(confidence) {
 }
 
 function formatAtom(atom, shortHash) {
-  const decisions = JSON.parse(atom.decisions || "[]");
-  const rejected = JSON.parse(atom.rejected_alternatives || "[]");
-  const files = JSON.parse(atom.files_affected || "[]");
-  const aiUsage = JSON.parse(atom.ai_usage || "{}");
+  const decisions = parseJson(atom.decisions, []);
+  const rejected = parseJson(atom.rejected_alternatives, []);
+  const files = parseJson(atom.files_affected, []);
+  const aiUsage = parseJson(atom.ai_usage, {});
   const totalTokens = (aiUsage.input_tokens ?? 0) + (aiUsage.output_tokens ?? 0);
   const models = (aiUsage.models ?? []).join(", ") || aiUsage.model || "unknown";
 
