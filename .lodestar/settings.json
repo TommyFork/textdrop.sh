@@ -1,0 +1,6 @@
+{
+  "project_id": "textdrop.sh",
+  "server_url": "https://lodestar-production.up.railway.app",
+  "capture_on_commit": true,
+  "distill": true
+}

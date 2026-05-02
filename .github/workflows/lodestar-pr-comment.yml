@@ -1,0 +1,39 @@
+name: Lodestar AI Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR commits
+        id: commits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMITS=$(gh api \
+            repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/commits \
+            --jq '.[].sha' \
+            | tr '\n' '\n')
+          echo "list<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post Lodestar audit comment
+        env:
+          LODESTAR_SERVER_URL: ${{ secrets.LODESTAR_SERVER_URL }}
+          LODESTAR_API_KEY: ${{ secrets.LODESTAR_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_COMMITS: ${{ steps.commits.outputs.list }}
+        run: node .github/scripts/lodestar-comment.js
